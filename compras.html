@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Compras - FILMEX</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container my-5">
+        <h2 class="text-center mb-4">Mis Compras</h2>
+        <div id="purchases-container">
+            <!-- Las compras se cargarán aquí mediante JavaScript -->
+        </div>
+    </div>
+
+    <!-- Include our improved JavaScript modules -->
+    <script src="js/router.js"></script>
+    <script src="js/mongo_connection.js"></script>
+    <script src="js/app-connector.js"></script>
+    <script src="js/auth-system.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+          const auth = new AuthSystem();
+          
+          if (!auth.currentUser) {
+              window.location.href = 'sesion.html';
+              return;
+          }
+
+          const purchasesContainer = document.getElementById('purchases-container');
+          const userPurchases = auth.currentUser.purchases || [];
+
+          if (userPurchases.length === 0) {
+              purchasesContainer.innerHTML = `
+                  <div class="alert alert-info text-center">
+                      <i class="fas fa-info-circle fa-2x mb-3"></i>
+                      <h4>Aún no has realizado ninguna compra</h4>
+                      <a href="index.html" class="btn btn-primary mt-3">Ir a la tienda</a>
+                  </div>
+              `;
+          } else {
+              purchasesContainer.innerHTML = userPurchases.map(purchase => `
+                  <div class="card mb-4">
+                      <div class="card-header">
+                          <h5>Compra #${purchase.id.substring(0, 8)}</h5>
+                          <small class="text-muted">${new Date(purchase.date).toLocaleDateString()}</small>
+                      </div>
+                      <div class="card-body">
+                          <div class="row">
+                              ${purchase.items.map(item => `
+                                  <div class="col-md-4 mb-3">
+                                      <div class="card h-100">
+                                          <img src="${item.image}" class="card-img-top" alt="${item.title}" style="height: 200px; object-fit: cover;">
+                                          <div class="card-body">
+                                              <h6 class="card-title">${item.title}</h6>
+                                              <p class="card-text">Cantidad: ${item.quantity}</p>
+                                              <p class="card-text">$${item.price.toFixed(2)} c/u</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              `).join('')}
+                          </div>
+                      </div>
+                      <div class="card-footer text-end">
+                          <strong>Total: $${purchase.total.toFixed(2)}</strong>
+                      </div>
+                  </div>
+              `).join('');
+          }
+      });
+    </script>
+</body>
+</html>
