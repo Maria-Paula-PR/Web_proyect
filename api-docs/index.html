@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FILMEX API Documentation</title>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@4.5.0/favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@4.5.0/favicon-16x16.png" sizes="16x16" />
+  <style>
+    html {
+      box-sizing: border-box;
+      overflow: -moz-scrollbars-vertical;
+      overflow-y: scroll;
+    }
+    
+    *,
+    *:before,
+    *:after {
+      box-sizing: inherit;
+    }
+    
+    body {
+      margin: 0;
+      background: #fafafa;
+    }
+    
+    .swagger-ui .topbar {
+      background-color: #212529;
+    }
+    
+    .swagger-ui .info .title {
+      color: #212529;
+    }
+    
+    .swagger-ui .btn.execute {
+      background-color: #0d6efd;
+      color: #fff;
+      border-color: #0d6efd;
+    }
+    
+    .swagger-ui .btn.execute:hover {
+      background-color: #0b5ed7;
+    }
+    
+    .swagger-ui .opblock.opblock-post {
+      background: rgba(73, 204, 144, 0.1);
+      border-color: #49cc90;
+    }
+    
+    .swagger-ui .opblock.opblock-get {
+      background: rgba(97, 175, 254, 0.1);
+      border-color: #61affe;
+    }
+    
+    .swagger-ui .opblock.opblock-delete {
+      background: rgba(249, 62, 62, 0.1);
+      border-color: #f93e3e;
+    }
+    
+    .swagger-ui .opblock.opblock-put {
+      background: rgba(252, 161, 48, 0.1);
+      border-color: #fca130;
+    }
+    
+    .topbar-wrapper img {
+      content: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="white"><path d="M256 8C119 8 8 119 8 256s111 248 248 248 248-111 248-248S393 8 256 8zm115.7 272l-176 101c-15.8 8.8-35.7-2.5-35.7-21V152c0-18.4 19.8-29.8 35.7-21l176 107c16.4 9.2 16.4 32.9 0 42z"/></svg>');
+      height: 40px;
+      width: 40px;
+      margin-right: 10px;
+    }
+    
+    .swagger-ui .topbar .download-url-wrapper .select-label {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script>
+    window.onload = function() {
+      // Begin Swagger UI call region
+      const ui = SwaggerUIBundle({
+        url: "swagger.json",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout",
+        defaultModelsExpandDepth: -1, // Hide schemas section by default
+        displayRequestDuration: true,
+        docExpansion: "list", // Show operations collapsed by default
+        filter: true, // Enable filtering operations
+        showExtensions: true,
+        tagsSorter: "alpha", // Sort tags alphabetically
+        operationsSorter: "alpha", // Sort operations alphabetically
+      });
+      // End Swagger UI call region
+
+      window.ui = ui;
+    };
+  </script>
+</body>
+</html>

@@ -1,153 +1,272 @@
-/**
- * Main script for FILMEX application
- * Handles movie catalog, cart functionality, and API interactions
- */
+// Configuración global
+const CONFIG = {
+  API_KEY: 'e60b122830b5717e215f3ca2112f8279',
+  LANGUAGE: 'es-MX',
+  CART_STORAGE_KEY: 'filmex_cart',
+  MOVIES_PER_PAGE: 6
+};
 
-// Initialize API Router
-const api = new ApiRouter('https://jsonplaceholder.typicode.com');
+// Variables de estado
+let currentPage = 1;
+let totalPages = 4;
+let movies = [];
+let cart = [];
 
-// Sample movie data (in a real app, this would come from an API)
-const movies = [
-  {
-    id: 1,
-    title: 'Interstellar',
-    description: 'Un grupo de exploradores emprende una misión espacial para encontrar un nuevo hogar para la humanidad.',
-    price: 19.99,
-    image: 'https://m.media-amazon.com/images/I/91obuWzA3XL._AC_UF1000,1000_QL80_.jpg',
-    year: 2014,
-    director: 'Christopher Nolan',
-    cast: 'Matthew McConaughey, Anne Hathaway, Jessica Chastain',
-    trailer: 'https://www.youtube.com/embed/zSWdZVtXT7E'
-  },
-  {
-    id: 2,
-    title: 'The Shawshank Redemption',
-    description: 'Dos hombres encarcelados forjan una amistad a lo largo de los años, encontrando consuelo y redención a través de actos de decencia común.',
-    price: 14.99,
-    image: 'https://m.media-amazon.com/images/I/51NiGlapXlL._AC_UF1000,1000_QL80_.jpg',
-    year: 1994,
-    director: 'Frank Darabont',
-    cast: 'Tim Robbins, Morgan Freeman, Bob Gunton',
-    trailer: 'https://www.youtube.com/embed/6hB3S9bIaco'
-  },
-  {
-    id: 3,
-    title: 'The Dark Knight',
-    description: 'Batman se enfrenta a un nuevo villano, el Joker, que busca sumir a Ciudad Gótica en la anarquía.',
-    price: 16.99,
-    image: 'https://m.media-amazon.com/images/I/91KkWf50SoL._AC_UF1000,1000_QL80_.jpg',
-    year: 2008,
-    director: 'Christopher Nolan',
-    cast: 'Christian Bale, Heath Ledger, Aaron Eckhart',
-    trailer: 'https://www.youtube.com/embed/EXeTwQWrcwY'
-  },
-  {
-    id: 4,
-    title: 'Pulp Fiction',
-    description: 'Las vidas de dos sicarios, un boxeador, la esposa de un gánster y un par de bandidos se entrelazan en cuatro historias de violencia y redención.',
-    price: 15.99,
-    image: 'https://m.media-amazon.com/images/I/71CXxWupsCL._AC_UF1000,1000_QL80_.jpg',
-    year: 1994,
-    director: 'Quentin Tarantino',
-    cast: 'John Travolta, Uma Thurman, Samuel L. Jackson',
-    trailer: 'https://www.youtube.com/embed/s7EdQ4FqbhY'
-  },
-  {
-    id: 5,
-    title: 'The Matrix',
-    description: 'Un programador descubre que la realidad es una simulación creada por máquinas inteligentes.',
-    price: 13.99,
-    image: 'https://m.media-amazon.com/images/I/51EG732BV3L._AC_UF1000,1000_QL80_.jpg',
-    year: 1999,
-    director: 'Lana y Lilly Wachowski',
-    cast: 'Keanu Reeves, Laurence Fishburne, Carrie-Anne Moss',
-    trailer: 'https://www.youtube.com/embed/vKQi3bBA1y8'
-  },
-  {
-    id: 6,
-    title: 'Forrest Gump',
-    description: 'Las décadas en la vida de Forrest Gump, un hombre con un coeficiente intelectual bajo que participa involuntariamente en eventos históricos de EE.UU.',
-    price: 12.99,
-    image: 'https://m.media-amazon.com/images/I/71xfR1wEUnL._AC_UF1000,1000_QL80_.jpg',
-    year: 1994,
-    director: 'Robert Zemeckis',
-    cast: 'Tom Hanks, Robin Wright, Gary Sinise',
-    trailer: 'https://www.youtube.com/embed/bLvqoHBptjg'
+// Clase para manejar películas
+class Movie {
+  constructor(id, title, price, image, description, director, cast, trailer) {
+    this.id = id;
+    this.title = title;
+    this.price = price;
+    this.image = image;
+    this.description = description;
+    this.director = director;
+    this.cast = cast;
+    this.trailer = trailer;
   }
-];
+}
 
-/**
- * Load movies into the products container
- */
-function loadMovies() {
-  const productsContainer = document.getElementById('products-container');
-  if (!productsContainer) return;
+// Funciones principales
+async function initializeApp() {
+  // Verificar si estamos en la página de carrito
+  const isCartPage = document.getElementById('cart-items') !== null;
 
-  // Clear container
-  productsContainer.innerHTML = '';
+  if (!isCartPage) {
+    await loadMovies();
+    renderMovies();
+    setupPagination();
+  }
 
-  // Add movie cards
-  movies.forEach(movie => {
-    const movieCard = document.createElement('div');
-    movieCard.className = 'col-md-4 mb-4';
-    movieCard.innerHTML = `
+  loadCart();
+  updateCartCount();
+
+  if (isCartPage) {
+    renderCart();
+  }
+
+  setupEventListeners();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initializeApp();
+  updateAuthUI();
+});
+
+
+// Cargar películas desde TMDb API
+async function loadMovies() {
+  try {
+    const response = await fetch(
+      `https://api.themoviedb.org/3/movie/popular?api_key=${CONFIG.API_KEY}&language=${CONFIG.LANGUAGE}&page=1`
+    );
+    const data = await response.json();
+
+    const rawMovies = data.results.slice(0, 20);
+
+    movies = await Promise.all(rawMovies.map(async movie => {
+      const [details, credits, videos] = await Promise.all([
+        fetchMovieDetails(movie.id),
+        fetchMovieCredits(movie.id),
+        fetchMovieVideos(movie.id)
+      ]);
+      
+      return new Movie(
+        movie.id,
+        movie.title,
+        calculatePrice(movie.vote_average),
+        `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+        movie.overview,
+        getDirector(credits.crew),
+        getMainCast(credits.cast),
+        getTrailer(videos.results)
+      );
+    }));
+  } catch (error) {
+    console.error('Error loading movies:', error);
+    showToast('Error al cargar películas', 'danger');
+  }
+}
+
+// Renderizar películas en la página principal
+function renderMovies() {
+  const container = document.getElementById('products-container');
+  if (!container) return;
+
+  const start = (currentPage - 1) * CONFIG.MOVIES_PER_PAGE;
+  const end = start + CONFIG.MOVIES_PER_PAGE;
+  const moviesToShow = movies.slice(start, end);
+
+  container.innerHTML = moviesToShow.map(movie => `
+    <div class="col-lg-4 col-md-6 mb-4">
       <div class="card h-100">
-        <img src="${movie.image}" class="card-img-top" alt="${movie.title}" style="height: 400px; object-fit: cover;">
-        <div class="card-body">
+        <img src="${movie.image}" class="card-img-top" alt="${movie.title}" loading="lazy">
+        <div class="card-body d-flex flex-column">
           <h5 class="card-title">${movie.title}</h5>
-          <p class="card-text">$${movie.price.toFixed(2)}</p>
-          <div class="d-flex justify-content-between">
-            <button class="btn btn-primary btn-sm" onclick="showMovieDetails(${movie.id})">
-              <i class="fas fa-info-circle"></i> Detalles
-            </button>
-            <button class="btn btn-success btn-sm" onclick="addToCart(${movie.id})">
+          <p class="card-text mt-auto">$${movie.price.toFixed(2)}</p>
+          <div class="d-grid gap-2 mt-3">
+            <button class="btn btn-primary" onclick="addToCart(${movie.id})">
               <i class="fas fa-cart-plus"></i> Agregar
+            </button>
+            <button class="btn btn-outline-secondary" onclick="showMovieDetails(${movie.id})">
+              <i class="fas fa-info-circle"></i> Detalles
             </button>
           </div>
         </div>
       </div>
-    `;
-    productsContainer.appendChild(movieCard);
-  });
+    </div>
+  `).join('');
 }
 
-/**
- * Show movie details in modal
- * @param {number} movieId - ID of the movie to show details for
- */
+// Configurar paginación
+function setupPagination() {
+  const container = document.getElementById('pagination');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  for (let i = 1; i <= totalPages; i++) {
+    const li = document.createElement('li');
+    li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+    li.addEventListener('click', (e) => {
+      e.preventDefault();
+      currentPage = i;
+      renderMovies();
+      setupPagination();
+    });
+    container.appendChild(li);
+  }
+}
+
+// Funciones de detalles de película
 function showMovieDetails(movieId) {
   const movie = movies.find(m => m.id === movieId);
   if (!movie) return;
 
-  // Set modal content
   document.getElementById('movieModalTitle').textContent = movie.title;
   document.getElementById('movieModalImage').src = movie.image;
-  document.getElementById('movieModalImage').alt = movie.title;
   document.getElementById('movieModalDescription').textContent = movie.description;
   document.getElementById('movieModalDirector').textContent = movie.director;
   document.getElementById('movieModalCast').textContent = movie.cast;
-  document.getElementById('movieModalTrailer').src = movie.trailer;
 
-  // Show modal
-  const movieModal = new bootstrap.Modal(document.getElementById('movieModal'));
-  movieModal.show();
+  const trailer = document.getElementById('movieModalTrailer');
+  trailer.src = movie.trailer;
+  trailer.closest('.modal').dataset.movieId = movieId;
+
+  const modal = new bootstrap.Modal(document.getElementById('movieModal'));
+  modal.show();
 }
 
-/**
- * Add a movie to cart
- * @param {number} movieId - ID of the movie to add to cart
- */
+// Funciones auxiliares para películas
+async function fetchMovieDetails(movieId) {
+  const response = await fetch(
+    `https://api.themoviedb.org/3/movie/${movieId}?api_key=${CONFIG.API_KEY}&language=${CONFIG.LANGUAGE}`
+  );
+  return response.json();
+}
+
+async function fetchMovieCredits(movieId) {
+  const response = await fetch(
+    `https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${CONFIG.API_KEY}`
+  );
+  return response.json();
+}
+
+async function fetchMovieVideos(movieId) {
+  const response = await fetch(
+    `https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${CONFIG.API_KEY}&language=${CONFIG.LANGUAGE}`
+  );
+  return response.json();
+}
+
+function getDirector(crew) {
+  const director = crew.find(person => person.job === 'Director');
+  return director ? director.name : 'Director no disponible';
+}
+
+function getMainCast(cast) {
+  return cast.slice(0, 3).map(actor => actor.name).join(', ');
+}
+
+function getTrailer(videos) {
+  const trailer = videos.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+  return trailer ? `https://www.youtube.com/embed/${trailer.key}` : '';
+}
+
+function calculatePrice(rating) {
+  return 80 + (Math.round(rating) * 5);
+}
+
+// Funciones del carrito
+function loadCart() {
+  const savedCart = localStorage.getItem(CONFIG.CART_STORAGE_KEY);
+  cart = savedCart ? JSON.parse(savedCart) : [];
+}
+
+function saveCart() {
+  localStorage.setItem(CONFIG.CART_STORAGE_KEY, JSON.stringify(cart));
+  updateCartCount();
+}
+
+function renderCart() {
+  const container = document.getElementById('cart-items');
+  const totalElement = document.getElementById('total-price');
+
+  if (!container || !totalElement) return;
+
+  if (cart.length === 0) {
+    container.innerHTML = `
+      <div class="col-12 text-center py-5">
+        <i class="fas fa-shopping-cart fa-5x text-muted mb-3"></i>
+        <h3>Tu carrito está vacío</h3>
+        <a href="index.html" class="btn btn-primary mt-3">Ir a la tienda</a>
+      </div>
+    `;
+    totalElement.textContent = "0.00";
+  } else {
+    container.innerHTML = cart.map(item => `
+      <div class="col-lg-6 col-md-6 mb-4">
+        <div class="card h-100">
+          <div class="row g-0">
+            <div class="col-md-4">
+              <img src="${item.image}" class="img-fluid rounded-start h-100" alt="${item.title}" style="object-fit: cover;">
+            </div>
+            <div class="col-md-8">
+              <div class="card-body">
+                <h5 class="card-title">${item.title}</h5>
+                <p class="card-text">Precio unitario: $${item.price.toFixed(2)}</p>
+                <div class="d-flex align-items-center mb-2">
+                  <button class="btn btn-outline-secondary btn-sm" onclick="changeQuantity(${item.id}, -1)">
+                    <i class="fas fa-minus"></i>
+                  </button>
+                  <span class="mx-2">${item.quantity}</span>
+                  <button class="btn btn-outline-secondary btn-sm" onclick="changeQuantity(${item.id}, 1)">
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+                <p class="card-text"><strong>Subtotal: $${(item.price * item.quantity).toFixed(2)}</strong></p>
+                <button class="btn btn-danger btn-sm" onclick="removeFromCart(${item.id})">
+                  <i class="fas fa-trash"></i> Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    totalElement.textContent = calculateTotal().toFixed(2);
+  }
+}
+
 function addToCart(movieId) {
   const movie = movies.find(m => m.id === movieId);
   if (!movie) return;
 
-  // Get current cart
-  let cart = getCart();
+  const existingItem = cart.find(item => item.id === movieId);
 
-  // Check if movie is already in cart
-  const existingItem = cart.find(item => item.id === movie.id);
   if (existingItem) {
-    existingItem.quantity += 1;
+    existingItem.quantity++;
   } else {
     cart.push({
       id: movie.id,
@@ -158,233 +277,148 @@ function addToCart(movieId) {
     });
   }
 
-  // Save cart
-  localStorage.setItem('filmex_cart', JSON.stringify(cart));
-  
-  // Update cart count
-  updateCartCount();
-
-  // Show confirmation
-  alert(`${movie.title} agregada al carrito`);
-
-  // Use MongoDB connection if available
-  try {
-    const auth = new AuthSystem();
-    if (auth.currentUser && typeof addOrden === 'function') {
-      // This is just to track cart additions, not actual purchases
-      addOrden(movie.title, movie.price, 1, auth.currentUser.id)
-        .then(result => console.log('Cart addition tracked in MongoDB:', result))
-        .catch(error => console.error('Error tracking cart addition in MongoDB:', error));
-    }
-  } catch (error) {
-    console.error('Error with MongoDB tracking:', error);
-  }
+  saveCart();
+  showToast(`${movie.title} agregada al carrito`);
 }
 
-/**
- * Load cart items and display them
- */
-function loadCart() {
-  const cartItemsContainer = document.getElementById('cart-items');
-  if (!cartItemsContainer) return;
-
-  const cart = getCart();
-  
-  // Calculate total
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const totalElement = document.getElementById('total-price');
-  if (totalElement) {
-    totalElement.textContent = total.toFixed(2);
-  }
-}
-
-/**
- * Render cart items in the cart page
- */
-function renderCart() {
-  const cartItemsContainer = document.getElementById('cart-items');
-  if (!cartItemsContainer) return;
-
-  const cart = getCart();
-  
-  if (cart.length === 0) {
-    cartItemsContainer.innerHTML = `
-      <div class="col-12">
-        <div class="alert alert-info text-center">
-          <i class="fas fa-shopping-cart fa-2x mb-3"></i>
-          <h4>Tu carrito está vacío</h4>
-          <a href="index.html" class="btn btn-primary mt-3">Ir a la tienda</a>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  // Clear container
-  cartItemsContainer.innerHTML = '';
-
-  // Add cart items
-  cart.forEach(item => {
-    const itemElement = document.createElement('div');
-    itemElement.className = 'col-md-4 mb-4';
-    itemElement.innerHTML = `
-      <div class="card">
-        <img src="${item.image}" class="card-img-top" alt="${item.title}" style="height: 200px; object-fit: cover;">
-        <div class="card-body">
-          <h5 class="card-title">${item.title}</h5>
-          <p class="card-text">Precio: $${item.price.toFixed(2)}</p>
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="btn-group">
-              <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${item.id}, ${item.quantity - 1})">-</button>
-              <span class="px-2">${item.quantity}</span>
-              <button class="btn btn-sm btn-outline-secondary" onclick="updateQuantity(${item.id}, ${item.quantity + 1})">+</button>
-            </div>
-            <button class="btn btn-danger btn-sm" onclick="removeFromCart(${item.id})">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-          <p class="card-text mt-2">Subtotal: $${(item.price * item.quantity).toFixed(2)}</p>
-        </div>
-      </div>
-    `;
-    cartItemsContainer.appendChild(itemElement);
-  });
-}
-
-/**
- * Update quantity of an item in cart
- * @param {number} itemId - ID of the item to update
- * @param {number} newQuantity - New quantity
- */
-function updateQuantity(itemId, newQuantity) {
-  if (newQuantity < 1) {
-    removeFromCart(itemId);
-    return;
-  }
-
-  let cart = getCart();
-  const item = cart.find(item => item.id === itemId);
-  if (item) {
-    item.quantity = newQuantity;
-    localStorage.setItem('filmex_cart', JSON.stringify(cart));
-    loadCart();
-    renderCart();
-    updateCartCount();
-  }
-}
-
-/**
- * Remove an item from cart
- * @param {number} itemId - ID of the item to remove
- */
-function removeFromCart(itemId) {
-  let cart = getCart();
-  cart = cart.filter(item => item.id !== itemId);
-  localStorage.setItem('filmex_cart', JSON.stringify(cart));
-  loadCart();
-  renderCart();
-  updateCartCount();
-}
-
-/**
- * Process checkout
- */
-function checkout() {
-  const auth = new AuthSystem();
-  if (!auth.currentUser) {
-    alert('Debes iniciar sesión para completar la compra');
-    window.location.href = 'sesion.html';
-    return;
-  }
-
-  const cart = getCart();
-  if (cart.length === 0) {
-    alert('Tu carrito está vacío');
-    return;
-  }
-
-  // Calculate total
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-  // Create purchase object
-  const purchase = {
-    items: cart,
-    total: total
-  };
-
-  // Add purchase to user history
-  const result = auth.addPurchase(purchase);
-  alert(result.message);
-
-  if (result.success) {
-    // Clear cart
-    localStorage.removeItem('filmex_cart');
-    updateCartCount();
-    
-    // Redirect to purchases page
-    window.location.href = 'compras.html';
-  }
-}
-
-/**
- * Cancel order and clear cart
- */
-function cancelOrder() {
-  if (confirm('¿Estás seguro de que deseas cancelar tu pedido?')) {
-    localStorage.removeItem('filmex_cart');
-    loadCart();
-    renderCart();
-    updateCartCount();
-  }
-}
-
-// Initialize the page based on which page we're on
-document.addEventListener('DOMContentLoaded', function() {
-  // Load movies on index page
-  if (document.getElementById('products-container')) {
-    loadMovies();
-  }
-  
-  // Load cart on cart page
+function removeFromCart(movieId) {
+  cart = cart.filter(item => item.id !== movieId);
+  saveCart();
   if (document.getElementById('cart-items')) {
-    loadCart();
     renderCart();
   }
-  
-  // Update auth UI on all pages
-  updateAuthUI();
-  
-  // Initialize API examples if we're on a page that needs them
-  initializeApiExamples();
-});
-
-/**
- * Initialize API examples
- * This demonstrates how to use our improved router.js
- */
-function initializeApiExamples() {
-  // Only run this if we're on a page that needs API examples
-  if (!document.getElementById('api-examples')) return;
-  
-  // Example GET request
-  api.get('/posts/1')
-    .then(data => {
-      console.log('GET example:', data);
-    })
-    .catch(error => {
-      console.error('GET error:', error);
-    });
-  
-  // Example POST request
-  api.post('/posts', {
-    title: 'Nuevo post',
-    body: 'Este es el contenido del post',
-    userId: 1
-  })
-    .then(data => {
-      console.log('POST example:', data);
-    })
-    .catch(error => {
-      console.error('POST error:', error);
-    });
 }
+
+function changeQuantity(movieId, change) {
+  const item = cart.find(item => item.id === movieId);
+  if (!item) return;
+
+  item.quantity += change;
+
+  if (item.quantity < 1) {
+    removeFromCart(movieId);
+  } else {
+    saveCart();
+    if (document.getElementById('cart-items')) {
+      renderCart();
+    }
+  }
+}
+
+function calculateTotal() {
+  return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+}
+
+function updateCartCount() {
+  const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const countElement = document.getElementById('cart-count');
+  if (countElement) countElement.textContent = count;
+}
+
+// Funciones globales para el carrito
+window.cancelOrder = function() {
+  if (confirm('¿Estás seguro de vaciar el carrito?')) {
+    cart = [];
+    saveCart();
+    renderCart();
+  }
+}
+
+window.checkout = function() {
+  if (cart.length === 0) {
+    showToast('El carrito está vacío', 'danger');
+    return;
+  }
+
+  if (confirm(`¿Confirmar compra por $${calculateTotal().toFixed(2)}?`)) {
+    cart = [];
+    saveCart();
+    showToast('¡Compra realizada con éxito!');
+    renderCart();
+  }
+}
+
+// Funciones de autenticación
+function updateAuthUI() {
+  const auth = new AuthSystem();
+  const user = auth.currentUser;
+
+  const loginNav = document.getElementById('loginNav');
+  const registerNav = document.getElementById('registerNav');
+  const userInfo = document.getElementById('user-info');
+  const purchasesNav = document.getElementById('purchasesNav');
+  const userName = document.getElementById('user-name');
+
+  if (user) {
+    if (loginNav) loginNav.style.display = 'none';
+    if (registerNav) registerNav.style.display = 'none';
+    if (userInfo) userInfo.style.display = 'block';
+    if (purchasesNav) purchasesNav.style.display = 'block';
+    if (userName) userName.textContent = user.name;
+  } else {
+    if (loginNav) loginNav.style.display = 'block';
+    if (registerNav) registerNav.style.display = 'block';
+    if (userInfo) userInfo.style.display = 'none';
+    if (purchasesNav) purchasesNav.style.display = 'none';
+    if (userName) userName.textContent = '';
+  }
+}
+
+function setupEventListeners() {
+  // Login form
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm) {
+    loginForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      if (email && password) {
+        showToast('Inicio de sesión exitoso');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+        modal.hide();
+      } else {
+        showToast('Por favor completa todos los campos', 'danger');
+      }
+    });
+  }
+
+  // Logout
+  const logoutBtn = document.getElementById('logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      const auth = new AuthSystem();
+      auth.logout();
+      showToast('Sesión cerrada');
+      updateAuthUI();
+      window.location.href = 'index.html';
+    });
+  }
+}
+
+// Funciones utilitarias
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = `toast show position-fixed bottom-0 end-0 m-3`;
+  toast.innerHTML = `
+    <div class="toast-header bg-${type} text-white">
+      <strong class="me-auto">${type === 'success' ? 'Éxito' : 'Error'}</strong>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body">${message}</div>
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Hacer funciones accesibles globalmente
+window.addToCart = addToCart;
+window.removeFromCart = removeFromCart;
+window.changeQuantity = changeQuantity;
+window.showMovieDetails = showMovieDetails;
+window.cancelOrder = cancelOrder;
+window.checkout = checkout;
+window.showToast = showToast;
+window.updateAuthUI = updateAuthUI; 
+window.AuthSystem = AuthSystem;
