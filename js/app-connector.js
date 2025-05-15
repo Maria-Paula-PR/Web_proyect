@@ -113,6 +113,43 @@ if (typeof window !== 'undefined') {
         return null;
       }
     };
+    
+    window.myPurchases = async function(user_id) {
+      try {
+        if (mongoDb.myPurchases) {
+          const result = await mongoDb.myPurchases(user_id);
+          // Ensure we always return an array, even if the result is null or undefined
+          return Array.isArray(result) ? result : [];
+        } else {
+          console.log('MongoDB connection not available, using local storage only');
+          return [];
+        }
+      } catch (error) {
+        console.error('Error in myPurchases:', error);
+        return [];
+      }
+    };
+    
+    window.addPurchase = async function(user_id, movie_id, movie_name, movie_price, cantidad = 1) {
+      try {
+        if (mongoDb.addPurchase) {
+          // Log the purchase attempt
+          console.log('Attempting to add purchase:', { user_id, movie_id, movie_name, movie_price, cantidad });
+          
+          // Call the MongoDB function with all available parameters
+          const result = await mongoDb.addPurchase(user_id, movie_id);
+          
+          // Return the result or an empty object if null/undefined
+          return result || { success: false, message: 'No result from MongoDB' };
+        } else {
+          console.log('MongoDB connection not available, using local storage only');
+          return { success: false, message: 'MongoDB connection not available' };
+        }
+      } catch (error) {
+        console.error('Error in addPurchase:', error);
+        return { success: false, message: error.message || 'Unknown error occurred' };
+      }
+    };
 
     console.log('MongoDB connection functions initialized');
   } catch (error) {

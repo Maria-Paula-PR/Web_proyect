@@ -340,6 +340,84 @@ async function getUserOrders(user_id) {
   }
 }
 
+async function addPurchase(user_id, movie_id, movie_name, movie_price, cantidad = 1) {
+  let client;
+  
+  try {
+    // Connect to MongoDB Atlas
+    const connection = await connectToDatabase();
+    client = connection.client;
+    const db = connection.db;
+
+    // Access the orders collection
+    const collection = db.collection('FAVS');
+    
+    // Create the purchase document with all available information
+    const purchaseDoc = {
+      user_id,
+      movie_id,
+      movie_name: movie_name || 'Unknown Movie',
+      movie_price: movie_price || 0,
+      cantidad: cantidad || 1,
+      total: (movie_price || 0) * (cantidad || 1),
+      order_date: new Date(),
+      status: 'completed'
+    };
+    
+    // Insert the purchase document
+    const result = await collection.insertOne(purchaseDoc);
+    
+    console.log(`Purchase added for user ${user_id}, movie ${movie_id}`);
+    return {
+      success: true,
+      message: 'Purchase added successfully',
+      purchase_id: result.insertedId,
+      purchase: purchaseDoc
+    };
+  } catch (error) {
+    console.error('Error adding purchase:', error);
+    return {
+      success: false,
+      message: error.message || 'Error adding purchase'
+    };
+  } finally {
+    // Close the MongoDB Atlas connection
+    if (client) {
+      await client.close();
+      console.log('Connection to MongoDB Atlas closed');
+    }
+  }
+}
+
+async function myPurchases(user_id) {
+  let client;
+  
+  try {
+    // Connect to MongoDB Atlas
+    const connection = await connectToDatabase();
+    client = connection.client;
+    const db = connection.db;
+
+    // Access the orders collection
+    const collection = db.collection('FAVS');
+    
+    // Query the collection
+    const orders = await collection.find({ user_id }).toArray();
+    
+    console.log(`Found ${orders.length} orders for user ${user_id}`);
+    return orders;
+  } catch (error) {
+    console.error('Error getting user orders:', error);
+    throw error;
+  } finally {
+    // Close the MongoDB Atlas connection
+    if (client) {
+      await client.close();
+      console.log('Connection to MongoDB Atlas closed');
+    }
+  }
+}
+
 // Export all functions
 module.exports = {
   addUser,
@@ -348,5 +426,7 @@ module.exports = {
   getFavoriteMovies,
   addOrden,
   getOrden,
-  getUserOrders
+  getUserOrders,
+  myPurchases,
+  addPurchase
 };

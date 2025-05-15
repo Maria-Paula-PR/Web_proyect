@@ -324,17 +324,76 @@ window.cancelOrder = function() {
   }
 }
 
-window.checkout = function() {
+window.checkout = async function() {
   if (cart.length === 0) {
     showToast('El carrito está vacío', 'danger');
     return;
   }
 
+  const auth = new AuthSystem();
+  if (!auth.currentUser) {
+    showToast('Debes iniciar sesión para completar la compra', 'warning');
+    window.location.href = 'sesion.html';
+    return;
+  }
+
   if (confirm(`¿Confirmar compra por $${calculateTotal().toFixed(2)}?`)) {
-    cart = [];
-    saveCart();
-    showToast('¡Compra realizada con éxito!');
-    renderCart();
+    try {
+      // Save purchase to local storage first
+      const purchase = {
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+        date: new Date().toISOString(),
+        items: cart,
+        total: calculateTotal()
+      };
+      
+      // Add to user's purchases in local storage
+      const users = JSON.parse(localStorage.getItem('filmex_users') || '[]');
+      const userIndex = users.findIndex(u => u.id === auth.currentUser.id);
+      
+      if (userIndex !== -1) {
+        if (!users[userIndex].purchases) users[userIndex].purchases = [];
+        users[userIndex].purchases.push(purchase);
+        localStorage.setItem('filmex_users', JSON.stringify(users));
+        
+        // Update current user in session
+        auth.currentUser.purchases = users[userIndex].purchases;
+        localStorage.setItem('filmex_current_user', JSON.stringify(auth.currentUser));
+      }
+      
+      // Save to MongoDB if available
+      for (const item of cart) {
+        if (typeof addPurchase === 'function') {
+          try {
+            // Call the enhanced addPurchase function with all available parameters
+            const result = await addPurchase(
+              auth.currentUser.id,       // user_id
+              item.id,                   // movie_id
+              item.title,                // movie_name
+              item.price,                // movie_price
+              item.quantity              // cantidad
+            );
+            console.log('Purchase added to MongoDB:', result);
+          } catch (error) {
+            console.error('Error adding purchase to MongoDB:', error);
+          }
+        }
+      }
+      
+      // Clear cart
+      cart = [];
+      saveCart();
+      showToast('¡Compra realizada con éxito!');
+      renderCart();
+      
+      // Redirect to purchases page
+      setTimeout(() => {
+        window.location.href = 'compras.html';
+      }, 1500);
+    } catch (error) {
+      console.error('Error processing purchase:', error);
+      showToast('Error al procesar la compra', 'danger');
+    }
   }
 }
 
